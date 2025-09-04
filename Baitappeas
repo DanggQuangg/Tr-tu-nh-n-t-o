@@ -1,0 +1,16 @@
+8 puzzles:
+•	P: sao cho nước đi để chiến thắng ít nhất
+•	E: bàn cờ 3x3 gồm các ô đánh số 1 tới 8 và 1 ô trống
+•	A: di chuyển ô số cạnh ô trống, lên xuống trái phải 
+•	S: nhận biết trạng thái hiện tại của bàn cờ
+Cờ caro:
+•	P: đánh sao cho tỉ lệ thắng cao nhất
+•	E: bàn cờ và các quân cờ XO, 	
+•	A: đánh dấu X hoặc O vào các ô trống trên bàn cờ 
+•	S: nhận biết trạng thái hiện tại của bàn cờ
+Cờ vua với 8 con hậu:
+•	P: tìm vị trí các con hậu thỏa mãn yêu cầu trong thời gian nhanh nhất
+•	E: bàn cờ 8x8 ô và 8 con hậu
+•	A: đặt con hậu ở các ô trống 
+•	S: nhận biết khi phạm lỗi và trạng thái hiện tại của bàn cờ 
+
