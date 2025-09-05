@@ -1,79 +1,94 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 from random import shuffle
+
 def lammoi():
-    pos = timvitrihau(8,randomize=True)
-    taobanco(bancophai, queens = pos, queenimg = hau)
-def timvitrihau(n = 8, randomize = True):
-    cot = [-1]*n
-    cotdadung =  set()
+    pos = timvitrihau(8, randomize=True)
+    veoco(bancophai, queens=pos, queenimg=hau)
+
+def timvitrihau(n=8, randomize=True):
+    cot = [-1] * n
+    cotdadung = set()
     duongcheochinh = set()
     duongcheophu = set()
     res = []
+
     def quaylui(r=0):
         if r == n:
-            res[:] = [(i,cot[i]) for i in range(n)]
+            res[:] = [(i, cot[i]) for i in range(n)]
             return True
-        order  = list(range(n))
+        order = list(range(n))
         if randomize:
             shuffle(order)
         for c in order:
-            if(c in cotdadung) or ((r-c)in duongcheochinh)or((r+c)in duongcheophu ):
+            if (c in cotdadung) or ((r - c) in duongcheochinh) or ((r + c) in duongcheophu):
                 continue
             cot[r] = c
-            cotdadung.add(c); duongcheochinh.add(r-c); duongcheophu.add(r+c)
-            if(quaylui(r+1)):
+            cotdadung.add(c)
+            duongcheochinh.add(r - c)
+            duongcheophu.add(r + c)
+            if quaylui(r + 1):
                 return True
-            cotdadung.remove(c); duongcheochinh.remove(r-c), duongcheophu.remove(r+c)
+            # backtrack
+            cotdadung.remove(c)
+            duongcheochinh.remove(r - c)
+            duongcheophu.remove(r + c)
         return False
+
     quaylui()
     return res
 
-def taobanco(r,title, size = 480 ):
-    frame = tk.LabelFrame(r, text = title, padx=8,pady=8)
+def taobanco(r, title, size=480):
+    frame = tk.LabelFrame(r, text=title, padx=8, pady=8)
     frame.grid_propagate(False)
     banco = tk.Frame(frame, height=size, width=size, bg="white")
-    banco.pack(fill = "both", expand=True)
+    banco.pack(fill="both", expand=True)
     for i in range(8):
-        banco.grid_columnconfigure(i,weight = 1, uniform = "o")
-        banco.grid_rowconfigure(i,weight = 1, uniform = "o")
+        banco.grid_columnconfigure(i, weight=1, uniform="o")
+        banco.grid_rowconfigure(i, weight=1, uniform="o")
     return frame, banco
-def veoco(banco, queens = None, queenimg = None):
+
+def veoco(banco, queens=None, queenimg=None):
     for w in banco.winfo_children():
         w.destroy()
     queens = set(queens or [])
     for i in range(8):
         for j in range(8):
-            color = "black" if (i+j) %2 else "white"
+            color = "black" if (i + j) % 2 else "white"
             o = tk.Frame(banco, bg=color, borderwidth=1, relief="solid")
             o.grid(row=i, column=j, sticky="nsew")
             o.grid_propagate(False)
-            if (i,j)in queens:
+            if (i, j) in queens:
                 if queenimg is not None:
-                    lbl = tk.Label(o, image = queenimg, bg = color)
-                    lbl.pack(expand = True)
+                    lbl = tk.Label(o, image=queenimg, bg=color)
+                    lbl.pack(expand=True)
                 else:
                     fg = "white" if color == "black" else "black"
-                    lbl = tk.Label(o, text = "Q", font=("Arial", 28, "bold"), fg=fg, bg=color)
+                    lbl = tk.Label(o, text="Q", font=("Arial", 28, "bold"), fg=fg, bg=color)
                     lbl.pack(expand=True)
+
+# === Main GUI ===
 root = tk.Tk()
 root.title("Bài toán 8 con hậu")
-root.grid_columnconfigure(0, weight= 1, uniform="khung")
-root.grid_columnconfigure(1, weight= 1, uniform="khung")
+root.grid_columnconfigure(0, weight=1, uniform="khung")
+root.grid_columnconfigure(1, weight=1, uniform="khung")
 root.grid_rowconfigure(0, weight=1)
 
-khungtrai , bancotrai = taobanco(root, "Bàn cờ ban đầu", size = 520)
-khungphai, bancophai = taobanco(root, "Bàn cờ sau khi giải", size = 520)
+khungtrai, bancotrai = taobanco(root, "Bàn cờ ban đầu", size=520)
+khungphai, bancophai = taobanco(root, "Bàn cờ sau khi giải", size=520)
 khungtrai.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 khungphai.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
-hau = ImageTk.PhotoImage(Image.open("queen.jpg").resize((56,56)))
 
-veoco(bancotrai,queens = [])
-veoco(bancophai, queens = timvitrihau(8,randomize=True),queenimg = hau)
+hau = ImageTk.PhotoImage(Image.open("queen.jpg").resize((56, 56)))
+
+veoco(bancotrai, queens=[])
+veoco(bancophai, queens=timvitrihau(8, randomize=True), queenimg=hau)
+
 toolbar = tk.Frame(root)
-toolbar.grid(row=1,column=0,columnspan=2, pady = (0,10))
+toolbar.grid(row=1, column=0, columnspan=2, pady=(0, 10))
 
-btntimvitrimoi = tk.Button(toolbar, text="Tìm vị trí khác", command = lammoi)
+btntimvitrimoi = tk.Button(toolbar, text="Tìm vị trí khác", command=lammoi)
 btntimvitrimoi.pack()
+
 root.minsize(900, 700)
 root.mainloop()
