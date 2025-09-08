@@ -3,10 +3,10 @@ from PIL import Image, ImageTk
 from random import shuffle
 
 def lammoi():
-    pos = timvitrihau(8, randomize=True)
+    pos = timvitrihau(4, randomize=True)
     veoco(bancophai, queens=pos, queenimg=hau)
 
-def timvitrihau(n=8, randomize=True):
+def timvitrihau(n=4, randomize=True):
     cot = [-1] * n
     cotdadung = set()
     duongcheochinh = set()
@@ -43,7 +43,7 @@ def taobanco(r, title, size=480):
     frame.grid_propagate(False)
     banco = tk.Frame(frame, height=size, width=size, bg="white")
     banco.pack(fill="both", expand=True)
-    for i in range(8):
+    for i in range(4):
         banco.grid_columnconfigure(i, weight=1, uniform="o")
         banco.grid_rowconfigure(i, weight=1, uniform="o")
     return frame, banco
@@ -52,8 +52,8 @@ def veoco(banco, queens=None, queenimg=None):
     for w in banco.winfo_children():
         w.destroy()
     queens = set(queens or [])
-    for i in range(8):
-        for j in range(8):
+    for i in range(4):
+        for j in range(4):
             color = "black" if (i + j) % 2 else "white"
             o = tk.Frame(banco, bg=color, borderwidth=1, relief="solid")
             o.grid(row=i, column=j, sticky="nsew")
@@ -69,7 +69,7 @@ def veoco(banco, queens=None, queenimg=None):
 
 # === Main GUI ===
 root = tk.Tk()
-root.title("Bài toán 8 con hậu")
+root.title("Bài toán 4 con hậu")
 root.grid_columnconfigure(0, weight=1, uniform="khung")
 root.grid_columnconfigure(1, weight=1, uniform="khung")
 root.grid_rowconfigure(0, weight=1)
@@ -82,7 +82,7 @@ khungphai.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
 hau = ImageTk.PhotoImage(Image.open("queen.jpg").resize((56, 56)))
 
 veoco(bancotrai, queens=[])
-veoco(bancophai, queens=timvitrihau(8, randomize=True), queenimg=hau)
+veoco(bancophai, queens=timvitrihau(4, randomize=True), queenimg=hau)
 
 toolbar = tk.Frame(root)
 toolbar.grid(row=1, column=0, columnspan=2, pady=(0, 10))
