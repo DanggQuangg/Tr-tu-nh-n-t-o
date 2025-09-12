@@ -1,10 +1,10 @@
 import tkinter as tk
 from PIL import Image, ImageTk
-import os
 
-class StepBacktracking:
-    def __init__(self, n=8):
+class StepDLS:
+    def __init__(self, n=8, max_depth=10):
         self.n = n
+        self.max_depth = max_depth  # Độ sâu giới hạn từ người dùng
         self.reset()
 
     def reset(self):
@@ -14,14 +14,14 @@ class StepBacktracking:
         self.used_d1 = set()          
         self.used_d2 = set()          
         self.r = 0                    
-        self.next_col = [0] * n       
+        self.next_col = [0] * n       # Khai báo next_col tại đây
 
     def current_positions(self):
         return [(i, self.cols[i]) for i in range(self.r) if self.cols[i] != -1]
 
     def step(self):
         n = self.n
-
+        # Nếu đã tìm thấy nghiệm, quay lui
         if self.r == n:
             self.r -= 1
             c_old = self.cols[self.r]
@@ -31,6 +31,7 @@ class StepBacktracking:
             self.cols[self.r] = -1
             self.next_col[self.r] = c_old + 1
             return True
+        
         c = self.next_col[self.r]
         while c < n and (
             (c in self.used_cols) or
@@ -39,7 +40,7 @@ class StepBacktracking:
         ):
             c += 1
 
-        if c < n:
+        if c < n and self.r < self.max_depth:  # Kiểm tra độ sâu nhập vào
             self.cols[self.r] = c
             self.used_cols.add(c)
             self.used_d1.add(self.r - c)
@@ -59,6 +60,7 @@ class StepBacktracking:
             self.cols[self.r] = -1
             self.next_col[self.r] = c_old + 1
             return True
+
 
 def taobanco(r, title, size=520):
     frame = tk.LabelFrame(r, text=title, padx=8, pady=8)
@@ -89,7 +91,6 @@ def veoco(banco, queens=None, queenimg=None):
 
 
 def buoc_tiep():
-
     prev_pos = solver.current_positions()
     veoco(bancotrai, queens=prev_pos, queenimg=hau)
     changed = solver.step()
@@ -97,9 +98,9 @@ def buoc_tiep():
     cur_pos = solver.current_positions()
     veoco(bancophai, queens=cur_pos, queenimg=hau)
     if solver.r == 8:
-        btn_buoc.config(text="Bước tiếp (đang ở nghiệm, bấm sẽ quay lui)")
+        btn_buoc.config(text="Bước tiếp (đang ở nghiệm, bấm sẽ quay lui) - Độ sâu giới hạn: {}".format(solver.max_depth))
     else:
-        btn_buoc.config(text="Bước tiếp")
+        btn_buoc.config(text="Bước tiếp - Độ sâu giới hạn: {}".format(solver.max_depth))
 
 def lam_moi():
     solver.reset()
@@ -107,8 +108,16 @@ def lam_moi():
     veoco(bancophai, queens=[], queenimg=hau)
     btn_buoc.config(text="Bước tiếp")
 
+def capnhat_max_depth():
+    try:
+        max_depth = int(entry_max_depth.get())
+        solver.max_depth = max_depth  # Cập nhật độ sâu giới hạn
+        lam_moi()  # Làm mới lại trạng thái sau khi thay đổi độ sâu
+    except ValueError:
+        print("Vui lòng nhập số nguyên hợp lệ.")
+
 root = tk.Tk()
-root.title("8 Hậu – Nhấn nút: đặt & quay lui từng bước")
+root.title("8 Hậu – Nhấn nút: đặt & quay lui từng bước (DLS)")
 root.grid_columnconfigure(0, weight=1, uniform="khung")
 root.grid_columnconfigure(1, weight=1, uniform="khung")
 root.grid_rowconfigure(0, weight=1)
@@ -121,7 +130,8 @@ khungphai.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
 hau = ImageTk.PhotoImage(Image.open("queen.jpg").resize((56, 56)))
 
 
-solver = StepBacktracking(n=8)
+# Mặc định độ sâu là 8
+solver = StepDLS(n=8, max_depth=8)
 veoco(bancotrai, queens=[], queenimg=hau)
 veoco(bancophai, queens=[], queenimg=hau)
 
@@ -133,6 +143,16 @@ btn_buoc.pack(side="left", padx=5)
 
 btn_lammoi = tk.Button(toolbar, text="Làm mới", command=lam_moi)
 btn_lammoi.pack(side="left", padx=5)
+
+# Thêm phần nhập độ sâu từ người dùng
+label_max_depth = tk.Label(toolbar, text="Độ sâu giới hạn:")
+label_max_depth.pack(side="left", padx=5)
+
+entry_max_depth = tk.Entry(toolbar)
+entry_max_depth.pack(side="left", padx=5)
+
+btn_capnhat_depth = tk.Button(toolbar, text="Cập nhật Độ sâu", command=capnhat_max_depth)
+btn_capnhat_depth.pack(side="left", padx=5)
 
 root.minsize(900, 700)
 root.mainloop()

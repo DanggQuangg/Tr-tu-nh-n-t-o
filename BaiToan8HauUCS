@@ -1,8 +1,8 @@
 import tkinter as tk
 from PIL import Image, ImageTk
-import os
+import heapq
 
-class StepBacktracking:
+class StepUCS:
     def __init__(self, n=8):
         self.n = n
         self.reset()
@@ -15,13 +15,14 @@ class StepBacktracking:
         self.used_d2 = set()          
         self.r = 0                    
         self.next_col = [0] * n       
+        self.cost = 0  # Chi phí hiện tại
 
     def current_positions(self):
         return [(i, self.cols[i]) for i in range(self.r) if self.cols[i] != -1]
 
     def step(self):
         n = self.n
-
+        # Nếu đã tìm thấy nghiệm, quay lui
         if self.r == n:
             self.r -= 1
             c_old = self.cols[self.r]
@@ -30,7 +31,9 @@ class StepBacktracking:
             self.used_d2.remove(self.r + c_old)
             self.cols[self.r] = -1
             self.next_col[self.r] = c_old + 1
+            self.cost -= 1  # Giảm chi phí khi quay lui
             return True
+        
         c = self.next_col[self.r]
         while c < n and (
             (c in self.used_cols) or
@@ -45,6 +48,7 @@ class StepBacktracking:
             self.used_d1.add(self.r - c)
             self.used_d2.add(self.r + c)
             self.r += 1
+            self.cost += 1  # Tăng chi phí khi đi tiếp
             if self.r < n:
                 self.next_col[self.r] = 0
             return True
@@ -59,6 +63,7 @@ class StepBacktracking:
             self.cols[self.r] = -1
             self.next_col[self.r] = c_old + 1
             return True
+
 
 def taobanco(r, title, size=520):
     frame = tk.LabelFrame(r, text=title, padx=8, pady=8)
@@ -89,7 +94,6 @@ def veoco(banco, queens=None, queenimg=None):
 
 
 def buoc_tiep():
-
     prev_pos = solver.current_positions()
     veoco(bancotrai, queens=prev_pos, queenimg=hau)
     changed = solver.step()
@@ -97,9 +101,9 @@ def buoc_tiep():
     cur_pos = solver.current_positions()
     veoco(bancophai, queens=cur_pos, queenimg=hau)
     if solver.r == 8:
-        btn_buoc.config(text="Bước tiếp (đang ở nghiệm, bấm sẽ quay lui)")
+        btn_buoc.config(text="Bước tiếp (đang ở nghiệm, bấm sẽ quay lui) - Chi phí: {}".format(solver.cost))
     else:
-        btn_buoc.config(text="Bước tiếp")
+        btn_buoc.config(text="Bước tiếp - Chi phí: {}".format(solver.cost))
 
 def lam_moi():
     solver.reset()
@@ -108,7 +112,7 @@ def lam_moi():
     btn_buoc.config(text="Bước tiếp")
 
 root = tk.Tk()
-root.title("8 Hậu – Nhấn nút: đặt & quay lui từng bước")
+root.title("8 Hậu – Nhấn nút: đặt & quay lui từng bước (UCS)")
 root.grid_columnconfigure(0, weight=1, uniform="khung")
 root.grid_columnconfigure(1, weight=1, uniform="khung")
 root.grid_rowconfigure(0, weight=1)
@@ -121,7 +125,7 @@ khungphai.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
 hau = ImageTk.PhotoImage(Image.open("queen.jpg").resize((56, 56)))
 
 
-solver = StepBacktracking(n=8)
+solver = StepUCS(n=8)
 veoco(bancotrai, queens=[], queenimg=hau)
 veoco(bancophai, queens=[], queenimg=hau)
 
