@@ -1,0 +1,242 @@
+import tkinter as tk
+from PIL import Image, ImageTk
+
+# ====== DLS từng bước cho 8 hậu (giữ nguyên tư duy backtracking + limit) ======
+class StepDLS:
+    def __init__(self, n=8, max_depth=8):
+        self.n = n
+        self.max_depth = max_depth
+        self.reset()
+
+    def reset(self):
+        n = self.n
+        self.cols = [-1] * n
+        self.used_cols = set()
+        self.used_d1 = set()     # r - c
+        self.used_d2 = set()     # r + c
+        self.r = 0               # hàng hiện tại (0..n)
+        self.next_col = [0] * n  # cột kế tiếp sẽ thử cho mỗi hàng
+
+    def current_positions(self):
+        return [(i, self.cols[i]) for i in range(self.r) if self.cols[i] != -1]
+
+    def step(self):
+        """
+        Thực hiện 1 bước (đặt hoặc quay lui 1 quân).
+        Trả về:
+          - True: có thay đổi trạng thái (đã đặt/quay lui 1 bước)
+          - False: không còn gì để làm (đã duyệt xong toàn bộ theo max_depth)
+        """
+        n = self.n
+
+        # Nếu đã đặt đủ n hàng: bắt đầu quay lui 1 bước
+        if self.r == n:
+            self.r -= 1
+            if self.r < 0:
+                return False
+            c_old = self.cols[self.r]
+            self.used_cols.remove(c_old)
+            self.used_d1.remove(self.r - c_old)
+            self.used_d2.remove(self.r + c_old)
+            self.cols[self.r] = -1
+            self.next_col[self.r] = c_old + 1
+            return True
+
+        # Thử từ cột hiện tại trở đi cho hàng r
+        c = self.next_col[self.r]
+        while c < n and (
+            (c in self.used_cols) or
+            ((self.r - c) in self.used_d1) or
+            ((self.r + c) in self.used_d2)
+        ):
+            c += 1
+
+        # Nếu tìm được c hợp lệ và chưa vượt quá max_depth thì đặt quân
+        if c < n and self.r < self.max_depth:
+            self.cols[self.r] = c
+            self.used_cols.add(c)
+            self.used_d1.add(self.r - c)
+            self.used_d2.add(self.r + c)
+            self.r += 1
+            if self.r < n:
+                self.next_col[self.r] = 0
+            return True
+        else:
+            # Không đặt được ở hàng r -> quay lui
+            if self.r == 0:
+                # quay lui ở r=0 nghĩa là hết không gian tìm kiếm (cutoff/finished)
+                return False
+            self.r -= 1
+            c_old = self.cols[self.r]
+            self.used_cols.remove(c_old)
+            self.used_d1.remove(self.r - c_old)
+            self.used_d2.remove(self.r + c_old)
+            self.cols[self.r] = -1
+            self.next_col[self.r] = c_old + 1
+            return True
+
+
+# ====== IDS: bao một DLS và tự tăng limit khi cạn không gian ở limit hiện tại ======
+class StepIDS:
+    def __init__(self, n=8, max_limit=8):
+        self.n = n
+        self.max_limit = max_limit   # giới hạn tối đa IDS được phép tăng
+        self.current_limit = 0       # limit hiện tại (bắt đầu từ 0)
+        self.dls = StepDLS(n=n, max_depth=self.current_limit)
+
+    def reset(self):
+        # reset về bắt đầu IDS (limit=0)
+        self.current_limit = 0
+        self.dls = StepDLS(n=self.n, max_depth=self.current_limit)
+
+    @property
+    def max_depth(self):
+        # để tương thích GUI cũ (hiển thị/nhập), ta hiển thị "giới hạn tối đa" của IDS
+        return self.max_limit
+
+    @max_depth.setter
+    def max_depth(self, v):
+        # khi người dùng cập nhật, coi là set lại giới hạn tối đa, và reset IDS
+        self.max_limit = max(0, int(v))
+        self.reset()
+
+    @property
+    def r(self):
+        # số hàng đã đặt hiện tại (đang trong DLS ở limit current_limit)
+        return self.dls.r
+
+    def current_positions(self):
+        return self.dls.current_positions()
+
+    def step(self):
+        """
+        Một lần bấm "Bước tiếp":
+         - Cố gắng đi 1 bước trong DLS với limit hiện tại.
+         - Nếu DLS báo hết (False), tăng limit lên +1 (nếu còn phép) và bắt đầu lại.
+         - Lặp như vậy cho đến khi có 1 thay đổi hoặc đã vượt max_limit.
+        """
+        # cố gắng đi 1 bước trong DLS hiện tại
+        if self.dls.step():
+            return True
+
+        # nếu không đổi được nữa ở limit hiện tại -> tăng limit
+        while self.current_limit < self.max_limit:
+            self.current_limit += 1
+            self.dls = StepDLS(n=self.n, max_depth=self.current_limit)
+            # sau khi tăng limit, thử đi ngay 1 bước để thể hiện tiến trình
+            if self.dls.step():
+                return True
+
+        # đã vượt quá max_limit -> dừng
+        return False
+
+
+# ====== GUI vẽ bàn cờ ======
+def taobanco(r, title, size=520):
+    frame = tk.LabelFrame(r, text=title, padx=8, pady=8)
+    frame.grid_propagate(False)
+    banco = tk.Frame(frame, height=size, width=size, bg="white")
+    banco.pack(fill="both", expand=True)
+    for i in range(8):
+        banco.grid_columnconfigure(i, weight=1, uniform="o")
+        banco.grid_rowconfigure(i, weight=1, uniform="o")
+    return frame, banco
+
+def veoco(banco, queens=None, queenimg=None):
+    for w in banco.winfo_children():
+        w.destroy()
+    queens = set(queens or [])
+    for i in range(8):
+        for j in range(8):
+            color = "#222" if (i + j) % 2 else "#eee"
+            cell = tk.Frame(banco, bg=color, borderwidth=1, relief="solid")
+            cell.grid(row=i, column=j, sticky="nsew")
+            cell.grid_propagate(False)
+            if (i, j) in queens:
+                if queenimg is not None:
+                    tk.Label(cell, image=queenimg, bg=color).pack(expand=True)
+                else:
+                    fg = "#eee" if color == "#222" else "#222"
+                    tk.Label(cell, text="Q", font=("Arial", 28, "bold"), fg=fg, bg=color).pack(expand=True)
+
+# ====== Callback nút ======
+def buoc_tiep():
+    prev_pos = solver.current_positions()
+    veoco(bancotrai, queens=prev_pos, queenimg=hau)
+
+    changed = solver.step()
+
+    cur_pos = solver.current_positions()
+    veoco(bancophai, queens=cur_pos, queenimg=hau)
+
+    if solver.r == 8:
+        btn_buoc.config(
+            text=f"Bước tiếp (đang ở nghiệm, bấm sẽ quay lui) - IDS limit hiện tại: {solver.dls.max_depth} / tối đa: {solver.max_depth}"
+        )
+    else:
+        status = "Hết (đã tới max tối đa)" if not changed else "..."
+        btn_buoc.config(
+            text=f"Bước tiếp - IDS limit hiện tại: {solver.dls.max_depth} / tối đa: {solver.max_depth} {'' if changed else '['+status+']'}"
+        )
+
+def lam_moi():
+    solver.reset()
+    veoco(bancotrai, queens=[], queenimg=hau)
+    veoco(bancophai, queens=[], queenimg=hau)
+    btn_buoc.config(text="Bước tiếp")
+
+def capnhat_max_depth():
+    try:
+        max_depth = int(entry_max_depth.get())
+        solver.max_depth = max_depth   # hiểu là "giới hạn tối đa" của IDS
+        lam_moi()
+    except ValueError:
+        print("Vui lòng nhập số nguyên hợp lệ.")
+
+# ====== App ======
+root = tk.Tk()
+root.title("8 Hậu – IDS (Iterative Deepening Search) từng bước")
+root.grid_columnconfigure(0, weight=1, uniform="khung")
+root.grid_columnconfigure(1, weight=1, uniform="khung")
+root.grid_rowconfigure(0, weight=1)
+
+khungtrai, bancotrai = taobanco(root, "Trước khi bấm (snapshot)")
+khungphai, bancophai = taobanco(root, "Sau khi bấm (đi 1 bước)")
+khungtrai.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+khungphai.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+
+# Ảnh hậu (fallback sang ký tự 'Q' nếu không có file)
+hau = None
+try:
+    from PIL import Image
+    img = Image.open("queen.jpg").resize((56, 56))
+    hau = ImageTk.PhotoImage(img)
+except Exception:
+    hau = None
+
+# IDS: default tối đa = 8 (tức là sẽ tăng từ 0..8)
+solver = StepIDS(n=8, max_limit=8)
+veoco(bancotrai, queens=[], queenimg=hau)
+veoco(bancophai, queens=[], queenimg=hau)
+
+toolbar = tk.Frame(root)
+toolbar.grid(row=1, column=0, columnspan=2, pady=(0, 10))
+
+btn_buoc = tk.Button(toolbar, text="Bước tiếp", command=buoc_tiep)
+btn_buoc.pack(side="left", padx=5)
+
+btn_lammoi = tk.Button(toolbar, text="Làm mới", command=lam_moi)
+btn_lammoi.pack(side="left", padx=5)
+
+label_max_depth = tk.Label(toolbar, text="Độ sâu tối đa (IDS):")
+label_max_depth.pack(side="left", padx=5)
+
+entry_max_depth = tk.Entry(toolbar, width=6)
+entry_max_depth.insert(0, "8")
+entry_max_depth.pack(side="left", padx=5)
+
+btn_capnhat_depth = tk.Button(toolbar, text="Cập nhật", command=capnhat_max_depth)
+btn_capnhat_depth.pack(side="left", padx=5)
+
+root.minsize(900, 700)
+root.mainloop()
