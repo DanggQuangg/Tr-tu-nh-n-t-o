@@ -1,28 +1,68 @@
 import tkinter as tk
 from PIL import Image, ImageTk
-import heapq
+import random
 
-class StepUCS:
+def generate_solution(n=8):
+    # Dùng backtracking để tìm một nghiệm, trả về danh sách (hàng,cột)
+    solution = []
+    cols = [-1]*n
+    used_cols = set()
+    used_d1 = set()
+    used_d2 = set()
+
+    def place(r):
+        if r == n:
+            return True
+        candidates = list(range(n))
+        random.shuffle(candidates)
+        for c in candidates:
+            if c in used_cols or (r-c) in used_d1 or (r+c) in used_d2:
+                continue
+            cols[r] = c
+            used_cols.add(c)
+            used_d1.add(r-c)
+            used_d2.add(r+c)
+            if place(r+1):
+                return True
+            # backtrack
+            cols[r] = -1
+            used_cols.remove(c)
+            used_d1.remove(r-c)
+            used_d2.remove(r+c)
+        return False
+
+    place(0)
+    for i in range(n):
+        solution.append( (i, cols[i]) )
+    return solution
+
+
+# ===============================
+# Thuật toán backtracking 8 Hậu
+# ===============================
+class StepBacktracking:
     def __init__(self, n=8):
         self.n = n
         self.reset()
+        self.last_pos = None  # lưu ô vừa đặt để highlight
 
     def reset(self):
         n = self.n
-        self.cols = [-1] * n          
+        self.cols = [-1] * n
         self.used_cols = set()
-        self.used_d1 = set()          
-        self.used_d2 = set()          
-        self.r = 0                    
-        self.next_col = [0] * n       
-        self.cost = 0  # Chi phí hiện tại
+        self.used_d1 = set()
+        self.used_d2 = set()
+        self.r = 0
+        self.next_col = [0] * n
+        self.last_pos = None
 
     def current_positions(self):
         return [(i, self.cols[i]) for i in range(self.r) if self.cols[i] != -1]
 
     def step(self):
         n = self.n
-        # Nếu đã tìm thấy nghiệm, quay lui
+
+        # Xử lý backtrack khi đạt cuối bàn cờ
         if self.r == n:
             self.r -= 1
             c_old = self.cols[self.r]
@@ -31,9 +71,9 @@ class StepUCS:
             self.used_d2.remove(self.r + c_old)
             self.cols[self.r] = -1
             self.next_col[self.r] = c_old + 1
-            self.cost -= 1  # Giảm chi phí khi quay lui
+            self.last_pos = None
             return True
-        
+
         c = self.next_col[self.r]
         while c < n and (
             (c in self.used_cols) or
@@ -47,13 +87,14 @@ class StepUCS:
             self.used_cols.add(c)
             self.used_d1.add(self.r - c)
             self.used_d2.add(self.r + c)
+            self.last_pos = (self.r, c)
             self.r += 1
-            self.cost += 1  # Tăng chi phí khi đi tiếp
             if self.r < n:
                 self.next_col[self.r] = 0
             return True
         else:
             if self.r == 0:
+                self.last_pos = None
                 return False
             self.r -= 1
             c_old = self.cols[self.r]
@@ -62,81 +103,139 @@ class StepUCS:
             self.used_d2.remove(self.r + c_old)
             self.cols[self.r] = -1
             self.next_col[self.r] = c_old + 1
+            self.last_pos = None
             return True
 
-
-def taobanco(r, title, size=520):
+# ===============================
+# GUI: tạo bàn cờ cố định
+# ===============================
+def taobanco_fixed(r, title, size=520):
     frame = tk.LabelFrame(r, text=title, padx=8, pady=8)
     frame.grid_propagate(False)
     banco = tk.Frame(frame, height=size, width=size, bg="white")
     banco.pack(fill="both", expand=True)
+    cells = [[None for _ in range(8)] for _ in range(8)]
     for i in range(8):
         banco.grid_columnconfigure(i, weight=1, uniform="o")
         banco.grid_rowconfigure(i, weight=1, uniform="o")
-    return frame, banco
-
-def veoco(banco, queens=None, queenimg=None):
-    for w in banco.winfo_children():
-        w.destroy()
-    queens = set(queens or [])
-    for i in range(8):
         for j in range(8):
             color = "black" if (i + j) % 2 else "white"
             cell = tk.Frame(banco, bg=color, borderwidth=1, relief="solid")
             cell.grid(row=i, column=j, sticky="nsew")
             cell.grid_propagate(False)
-            if (i, j) in queens:
-                if queenimg is not None:
-                    tk.Label(cell, image=queenimg, bg=color).pack(expand=True)
-                else:
-                    fg = "white" if color == "black" else "black"
-                    tk.Label(cell, text="Q", font=("Arial", 28, "bold"), fg=fg, bg=color).pack(expand=True)
+            cells[i][j] = cell
+    return frame, banco, cells
 
+# ===============================
+# Vẽ hoặc cập nhật hậu với highlight
+# ===============================
+def veoco_fixed(cells, queens=None, queenimg=None, highlight=None):
+    # Xóa Label cũ
+    for i in range(8):
+        for j in range(8):
+            for w in cells[i][j].winfo_children():
+                w.destroy()
+            # Reset viền
+            cells[i][j]["highlightbackground"] = "black"
+            cells[i][j]["highlightthickness"] = 1
 
-def buoc_tiep():
-    prev_pos = solver.current_positions()
-    veoco(bancotrai, queens=prev_pos, queenimg=hau)
-    changed = solver.step()
+    queens = set(queens or [])
+    for (i,j) in queens:
+        if queenimg is not None:
+            tk.Label(cells[i][j], image=queenimg, bg=cells[i][j]["bg"]).pack(expand=True)
+        else:
+            color = cells[i][j]["bg"]
+            fg = "white" if color == "black" else "black"
+            tk.Label(cells[i][j], text="Q", font=("Arial",28,"bold"), fg=fg, bg=color).pack(expand=True)
 
-    cur_pos = solver.current_positions()
-    veoco(bancophai, queens=cur_pos, queenimg=hau)
-    if solver.r == 8:
-        btn_buoc.config(text="Bước tiếp (đang ở nghiệm, bấm sẽ quay lui) - Chi phí: {}".format(solver.cost))
-    else:
-        btn_buoc.config(text="Bước tiếp - Chi phí: {}".format(solver.cost))
+    # Highlight ô mới
+    if highlight:
+        i,j = highlight
+        cells[i][j]["highlightbackground"] = "yellow"
+        cells[i][j]["highlightthickness"] = 3
 
-def lam_moi():
-    solver.reset()
-    veoco(bancotrai, queens=[], queenimg=hau)
-    veoco(bancophai, queens=[], queenimg=hau)
-    btn_buoc.config(text="Bước tiếp")
-
+# ===============================
+# GUI chính
+# ===============================
 root = tk.Tk()
-root.title("8 Hậu – Nhấn nút: đặt & quay lui từng bước (UCS)")
+root.title("8 Hậu – Backtracking với Highlight")
 root.grid_columnconfigure(0, weight=1, uniform="khung")
 root.grid_columnconfigure(1, weight=1, uniform="khung")
 root.grid_rowconfigure(0, weight=1)
 
-khungtrai, bancotrai = taobanco(root, "Trước khi bấm (snapshot)")
-khungphai, bancophai = taobanco(root, "Sau khi bấm (đi 1 bước)")
+# Bàn trái: quá trình
+khungtrai, bancotrai, cells_trai = taobanco_fixed(root, "Bàn cờ (quá trình)")
+# Bàn phải: mục tiêu
+khungphai, bancophai, cells_phai = taobanco_fixed(root, "Bàn cờ mục tiêu")
 khungtrai.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 khungphai.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
 
+# Load ảnh hậu
 hau = ImageTk.PhotoImage(Image.open("queen.jpg").resize((56, 56)))
 
+# Solver
+solver = StepBacktracking(n=8)
 
-solver = StepUCS(n=8)
-veoco(bancotrai, queens=[], queenimg=hau)
-veoco(bancophai, queens=[], queenimg=hau)
+# Trạng thái mục tiêu (một nghiệm chuẩn)
+muc_tieu = [(0,3),(1,5),(2,7),(3,1),(4,6),(5,4),(6,2),(7,0)]
+veoco_fixed(cells_phai, queens=muc_tieu, queenimg=hau)
 
+# Bàn trái trống
+veoco_fixed(cells_trai, queens=[], queenimg=hau)
+
+# ===============================
+# Thông số tốc độ
+# ===============================
+delay = 500  # ms
+running = False
+
+def buoc_tiep():
+    global running
+    running = True
+    def run_step():
+        global running
+        if not running:
+            return
+        prev_pos = solver.current_positions()
+        veoco_fixed(cells_trai, queens=prev_pos, queenimg=hau, highlight=solver.last_pos)
+        changed = solver.step()
+        veoco_fixed(cells_phai, queens=muc_tieu, queenimg=hau)
+        if solver.r == 8:
+            running = False
+            btn_buoc.config(text="Đã đạt nghiệm")
+        else:
+            root.after(delay, run_step)
+    run_step()
+
+def lam_moi():
+    global running, muc_tieu
+    running = False
+    solver.reset()
+    veoco_fixed(cells_trai, queens=[], queenimg=hau)
+    # Tạo nghiệm mục tiêu mới
+    muc_tieu = generate_solution(8)
+    veoco_fixed(cells_phai, queens=muc_tieu, queenimg=hau)
+    btn_buoc.config(text="Bắt đầu")
+
+
+def tang_toc():
+    global delay
+    delay = 100  # 0.1 giây
+
+# ===============================
+# Toolbar
+# ===============================
 toolbar = tk.Frame(root)
-toolbar.grid(row=1, column=0, columnspan=2, pady=(0, 10))
+toolbar.grid(row=1, column=0, columnspan=2, pady=(0,10))
 
-btn_buoc = tk.Button(toolbar, text="Bước tiếp", command=buoc_tiep)
+btn_buoc = tk.Button(toolbar, text="Bắt đầu", command=buoc_tiep)
 btn_buoc.pack(side="left", padx=5)
+
+btn_tangtoc = tk.Button(toolbar, text="Tăng tốc", command=tang_toc)
+btn_tangtoc.pack(side="left", padx=5)
 
 btn_lammoi = tk.Button(toolbar, text="Làm mới", command=lam_moi)
 btn_lammoi.pack(side="left", padx=5)
 
-root.minsize(900, 700)
+root.minsize(900,700)
 root.mainloop()

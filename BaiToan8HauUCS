@@ -15,14 +15,13 @@ class StepUCS:
         self.used_d2 = set()          
         self.r = 0                    
         self.next_col = [0] * n       
-        self.cost = 0  # Chi phí hiện tại
+        self.cost = 0 
 
     def current_positions(self):
         return [(i, self.cols[i]) for i in range(self.r) if self.cols[i] != -1]
 
     def step(self):
         n = self.n
-        # Nếu đã tìm thấy nghiệm, quay lui
         if self.r == n:
             self.r -= 1
             c_old = self.cols[self.r]
@@ -31,7 +30,7 @@ class StepUCS:
             self.used_d2.remove(self.r + c_old)
             self.cols[self.r] = -1
             self.next_col[self.r] = c_old + 1
-            self.cost -= 1  # Giảm chi phí khi quay lui
+            self.cost -= 1 
             return True
         
         c = self.next_col[self.r]
@@ -48,7 +47,7 @@ class StepUCS:
             self.used_d1.add(self.r - c)
             self.used_d2.add(self.r + c)
             self.r += 1
-            self.cost += 1  # Tăng chi phí khi đi tiếp
+            self.cost += 1 
             if self.r < n:
                 self.next_col[self.r] = 0
             return True

@@ -4,7 +4,7 @@ from PIL import Image, ImageTk
 class StepDLS:
     def __init__(self, n=8, max_depth=10):
         self.n = n
-        self.max_depth = max_depth  # Độ sâu giới hạn từ người dùng
+        self.max_depth = max_depth  
         self.reset()
 
     def reset(self):
@@ -14,14 +14,12 @@ class StepDLS:
         self.used_d1 = set()          
         self.used_d2 = set()          
         self.r = 0                    
-        self.next_col = [0] * n       # Khai báo next_col tại đây
-
+        self.next_col = [0] * n      
     def current_positions(self):
         return [(i, self.cols[i]) for i in range(self.r) if self.cols[i] != -1]
 
     def step(self):
         n = self.n
-        # Nếu đã tìm thấy nghiệm, quay lui
         if self.r == n:
             self.r -= 1
             c_old = self.cols[self.r]
@@ -40,7 +38,7 @@ class StepDLS:
         ):
             c += 1
 
-        if c < n and self.r < self.max_depth:  # Kiểm tra độ sâu nhập vào
+        if c < n and self.r < self.max_depth:  
             self.cols[self.r] = c
             self.used_cols.add(c)
             self.used_d1.add(self.r - c)
@@ -111,8 +109,8 @@ def lam_moi():
 def capnhat_max_depth():
     try:
         max_depth = int(entry_max_depth.get())
-        solver.max_depth = max_depth  # Cập nhật độ sâu giới hạn
-        lam_moi()  # Làm mới lại trạng thái sau khi thay đổi độ sâu
+        solver.max_depth = max_depth  
+        lam_moi()  
     except ValueError:
         print("Vui lòng nhập số nguyên hợp lệ.")
 
@@ -130,7 +128,6 @@ khungphai.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
 hau = ImageTk.PhotoImage(Image.open("queen.jpg").resize((56, 56)))
 
 
-# Mặc định độ sâu là 8
 solver = StepDLS(n=8, max_depth=8)
 veoco(bancotrai, queens=[], queenimg=hau)
 veoco(bancophai, queens=[], queenimg=hau)
@@ -144,7 +141,6 @@ btn_buoc.pack(side="left", padx=5)
 btn_lammoi = tk.Button(toolbar, text="Làm mới", command=lam_moi)
 btn_lammoi.pack(side="left", padx=5)
 
-# Thêm phần nhập độ sâu từ người dùng
 label_max_depth = tk.Label(toolbar, text="Độ sâu giới hạn:")
 label_max_depth.pack(side="left", padx=5)
 
