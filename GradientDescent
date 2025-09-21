@@ -16,7 +16,6 @@ def cost(state):
     return conflicts
 
 def best_neighbor(state):
-    """Tìm neighbor có cost tốt nhất (giảm nhiều nhất)"""
     n = len(state)
     best_state = state[:]
     best_cost = cost(state)

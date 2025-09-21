@@ -15,24 +15,16 @@ def cost(state):
                 conflicts += 1
     return conflicts
 
-def best_neighbor(state):
-    """Tìm neighbor có cost tốt nhất (giảm nhiều nhất)"""
+def all_neighbors(state):
     n = len(state)
-    best_state = state[:]
-    best_cost = cost(state)
-    best_row, best_col = -1, -1
+    neighbors = []
     for row in range(n):
         for col in range(n):
-            if col == state[row]:
-                continue
-            new_state = state[:]
-            new_state[row] = col
-            c = cost(new_state)
-            if c < best_cost:
-                best_cost = c
-                best_state = new_state[:]
-                best_row, best_col = row, col
-    return best_state, best_cost, best_row, best_col
+            if col != state[row]:
+                new_state = state[:]
+                new_state[row] = col
+                neighbors.append((new_state, row, col))
+    return neighbors
 
 def taobanco_fixed(r, title, n=4, size=360):
     frame = tk.LabelFrame(r, text=title, padx=8, pady=8)
@@ -69,81 +61,76 @@ def veoco_fixed(cells, state=None, queenimg=None, highlight=None):
                 fg = "white" if color == "black" else "black"
                 tk.Label(cells[row][col], text="Q", font=("Arial",28,"bold"), fg=fg, bg=color).pack(expand=True)
 
-    if highlight and highlight[0] != -1:
+    if highlight:
         i, j = highlight
         cells[i][j]["highlightbackground"] = "yellow"
         cells[i][j]["highlightthickness"] = 3
 
 
 root = tk.Tk()
-root.title("4 Hậu – Gradient Descent")
+root.title("4 Hậu – Beam Search")
 root.grid_columnconfigure(0, weight=1, uniform="khung")
 root.grid_columnconfigure(1, weight=1, uniform="khung")
 root.grid_rowconfigure(0, weight=1)
 
-khungtrai, _, cells_trai = taobanco_fixed(root, "Bàn cờ hiện tại", n=4)
-khungphai, _, cells_phai = taobanco_fixed(root, "Bàn cờ GD", n=4)
+khungtrai, _, cells_trai = taobanco_fixed(root, "Một state trong Beam", n=4)
+khungphai, _, cells_phai = taobanco_fixed(root, "State tốt nhất", n=4)
 khungtrai.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 khungphai.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
 
 hau = ImageTk.PhotoImage(Image.open("queen.jpg").resize((64, 64)))
 
-state = random_state(4)
-veoco_fixed(cells_trai, state, hau)
-veoco_fixed(cells_phai, state, hau)
-
-running = False
-delay = 800
+beam_width = 3
+beam = []
 step_count = 0
+running = False
+delay = 1000
 
-frame_log = tk.LabelFrame(root, text="Log chạy thuật toán", padx=5, pady=5)
+frame_log = tk.LabelFrame(root, text="Log chạy Beam Search", padx=5, pady=5)
 frame_log.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
 
-columns = ("Step", "Cost", "Row", "Col")
+columns = ("Step", "Cost", "BeamStates")
 tree = ttk.Treeview(frame_log, columns=columns, show="headings", height=8)
 for col in columns:
     tree.heading(col, text=col)
-    tree.column(col, width=80, anchor="center")
+    tree.column(col, width=120, anchor="center")
 tree.pack(fill="both", expand=True)
 
 def run_step():
-    global state, running, step_count
+    global beam, running, step_count
     if not running:
         return
 
     step_count += 1
-    new_state, new_cost, row, col = best_neighbor(state)
-    if new_cost < cost(state):
-        state = new_state
-        veoco_fixed(cells_trai, state, hau, highlight=(row, col))
-        veoco_fixed(cells_phai, state, hau)
-        lbl_info.config(text=f"Cost={new_cost}")
-        tree.insert("", "end", values=(step_count, new_cost, row, col))
-    else:
-        lbl_info.config(text=f"Dừng tại cost={cost(state)} (local minima)")
-        running = False
-        btn_start.config(text="Đã dừng")
-        return
+    candidates = []
+    for state in beam:
+        candidates.extend(all_neighbors(state))
+    candidates.sort(key=lambda x: cost(x[0]))
+    beam = [s for s, _, _ in candidates[:beam_width]]
+    veoco_fixed(cells_trai, beam[0], hau)
+    veoco_fixed(cells_phai, beam[0], hau)
+    lbl_info.config(text=f"Step={step_count}, best cost={cost(beam[0])}")
 
-    if cost(state) == 0:
-        lbl_info.config(text="Tìm thấy nghiệm tối ưu!")
+    tree.insert("", "end", values=(step_count, cost(beam[0]), len(beam)))
+
+    if cost(beam[0]) == 0:
         running = False
-        btn_start.config(text="Đã dừng")
+        btn_start.config(text="Đã dừng (Tìm thấy nghiệm)")
         return
 
     root.after(delay, run_step)
 
 def start():
-    global running, state, step_count
-    state = random_state(4)
-    veoco_fixed(cells_trai, state, hau)
-    veoco_fixed(cells_phai, state, hau)
-    lbl_info.config(text=f"Khởi tạo: cost={cost(state)}")
-    btn_start.config(text="Đang chạy")
+    global beam, running, step_count
     step_count = 0
+    beam = [random_state(4) for _ in range(beam_width)]
+    veoco_fixed(cells_trai, beam[0], hau)
+    veoco_fixed(cells_phai, beam[0], hau)
+    lbl_info.config(text=f"Khởi tạo Beam width={beam_width}")
     for i in tree.get_children():
         tree.delete(i)  
     running = True
+    btn_start.config(text="Đang chạy")
     run_step()
 
 def stop():

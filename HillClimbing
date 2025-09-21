@@ -1,25 +1,21 @@
-import tkinter as tk
+import tkinter as tk 
+from tkinter import ttk
 from PIL import Image, ImageTk
-import random, math
+import random
 
-# ===============================
-# Hàm tiện ích
-# ===============================
 def random_state(n=4):
-    """ Sinh ngẫu nhiên một state: mỗi hàng 1 hậu, cột ngẫu nhiên """
     return [random.randint(0, n-1) for _ in range(n)]
 
-def cost(state, previous_state):
-    """ Tính số lần di chuyển quân hậu ít nhất trong mỗi hàng """
-    moves = 0
-    for i in range(len(state)):
-        # Nếu quân hậu di chuyển đến cột khác với vị trí ban đầu
-        if state[i] != previous_state[i]:
-            moves += 1
-    return moves
+def cost(state):
+    n = len(state)
+    conflicts = 0
+    for i in range(n):
+        for j in range(i+1, n):
+            if state[i] == state[j] or abs(state[i]-state[j]) == abs(i-j):
+                conflicts += 1
+    return conflicts
 
 def neighbor(state):
-    """ Sinh state lân cận bằng cách di chuyển 1 hậu sang cột khác """
     n = len(state)
     new_state = state[:]
     row = random.randint(0, n-1)
@@ -29,9 +25,6 @@ def neighbor(state):
     new_state[row] = new_col
     return new_state, row, new_col
 
-# ===============================
-# GUI: tạo bàn cờ cố định n×n
-# ===============================
 def taobanco_fixed(r, title, n=4, size=360):
     frame = tk.LabelFrame(r, text=title, padx=8, pady=8)
     frame.grid_propagate(False)
@@ -49,9 +42,6 @@ def taobanco_fixed(r, title, n=4, size=360):
             cells[i][j] = cell
     return frame, banco, cells
 
-# ===============================
-# Vẽ hậu với highlight
-# ===============================
 def veoco_fixed(cells, state=None, queenimg=None, highlight=None):
     n = len(cells)
     for i in range(n):
@@ -75,146 +65,95 @@ def veoco_fixed(cells, state=None, queenimg=None, highlight=None):
         cells[i][j]["highlightbackground"] = "yellow"
         cells[i][j]["highlightthickness"] = 3
 
-# ===============================
-# GUI chính
-# ===============================
+
 root = tk.Tk()
-root.title("4 Hậu – Simulated Annealing")
+root.title("4 Hậu – Hill Climbing")
 root.grid_columnconfigure(0, weight=1, uniform="khung")
 root.grid_columnconfigure(1, weight=1, uniform="khung")
 root.grid_rowconfigure(0, weight=1)
 
-# Bàn trái và bàn phải
 khungtrai, _, cells_trai = taobanco_fixed(root, "Bàn cờ hiện tại", n=4)
-khungphai, _, cells_phai = taobanco_fixed(root, "Bàn cờ SA", n=4)
+khungphai, _, cells_phai = taobanco_fixed(root, "Bàn cờ HC", n=4)
 khungtrai.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 khungphai.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
 
-# Load ảnh hậu
 hau = ImageTk.PhotoImage(Image.open("queen.jpg").resize((64, 64)))
 
-# Trạng thái
 state = random_state(4)
-previous_state = state[:]  # Lưu trạng thái trước đó để tính chi phí
 veoco_fixed(cells_trai, state, hau)
 veoco_fixed(cells_phai, state, hau)
 
-# ===============================
-# Biến điều khiển
-# ===============================
 running = False
 delay = 800
-T = 10.0
-alpha = 0.95
-K = 1000  # Số vòng lặp tối đa
-iterations = 0
+step_count = 0
 
-# ===============================
-# Hàm chạy SA step
-# ===============================
+frame_log = tk.LabelFrame(root, text="Log chạy thuật toán", padx=5, pady=5)
+frame_log.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+
+columns = ("Step", "Cost", "Accept", "Row", "Col")
+tree = ttk.Treeview(frame_log, columns=columns, show="headings", height=8)
+for col in columns:
+    tree.heading(col, text=col)
+    tree.column(col, width=80, anchor="center")
+tree.pack(fill="both", expand=True)
+
 def run_step():
-    global state, previous_state, T, running, iterations
+    global state, running, step_count
     if not running:
         return
 
-    current_cost = cost(state, previous_state)
+    step_count += 1
+    current_cost = cost(state)
     new_state, row, col = neighbor(state)
-    new_cost = cost(new_state, previous_state)
-    deltaE = new_cost - current_cost
+    new_cost = cost(new_state)
 
     accept = False
-    if deltaE <= 0:
-        accept = True
-    else:
-        p = math.exp(-deltaE / T)
-        if random.random() < p:
-            accept = True
-
-    if accept:
-        previous_state = state[:]
+    if new_cost <= current_cost:  
         state = new_state
+        accept = True
 
-    # Cập nhật giao diện
     veoco_fixed(cells_trai, state, hau, highlight=(row, state[row]))
     veoco_fixed(cells_phai, state, hau)
-    lbl_info.config(text=f"T={T:.2f}, cost={cost(state, previous_state)}, ΔE={deltaE}, Iterations={iterations}/{K}")
+    lbl_info.config(text=f"cost={cost(state)}")
 
-    # Giảm T
-    T *= alpha
-    iterations += 1
+    tree.insert("", "end", values=(step_count, cost(state), "Yes" if accept else "No", row, state[row]))
 
-    if iterations >= K or cost(state, previous_state) == 0:
+    if cost(state) == 0:   
         running = False
-        btn_start.config(text="Đã dừng")
+        btn_start.config(text="Đã dừng (Thành công)")
         return
 
     root.after(delay, run_step)
 
-# ===============================
-# Button functions
-# ===============================
 def start():
-    global running, T, alpha, K, iterations, state, previous_state
-    try:
-        T0 = float(entry_T.get())
-        a = float(entry_alpha.get())
-        K = int(entry_K.get())  # Lấy giá trị K
-    except:
-        T0, a, K = 10.0, 0.95, 1000
+    global running, state, step_count
     state = random_state(4)
-    previous_state = state[:]
     veoco_fixed(cells_trai, state, hau)
     veoco_fixed(cells_phai, state, hau)
-    lbl_info.config(text=f"Khởi tạo: cost={cost(state, previous_state)}")
+    lbl_info.config(text=f"Khởi tạo: cost={cost(state)}")
     btn_start.config(text="Đang chạy")
-    reset_Ta(T0, a)
-    reset_K(K)
+    step_count = 0
+    for i in tree.get_children():
+        tree.delete(i)  
     running = True
-    iterations = 0
     run_step()
-
-def reset_Ta(T0, a):
-    global T, alpha
-    T = T0
-    alpha = a
-
-def reset_K(K_val):
-    global K
-    K = K_val
 
 def stop():
     global running
     running = False
     btn_start.config(text="Bắt đầu")
 
-# ===============================
-# Toolbar
-# ===============================
 toolbar = tk.Frame(root)
 toolbar.grid(row=1, column=0, columnspan=2, pady=(5,5))
 
-tk.Label(toolbar, text="T ban đầu:").pack(side="left")
-entry_T = tk.Entry(toolbar, width=6)
-entry_T.insert(0, "10")
-entry_T.pack(side="left", padx=5)
-
-tk.Label(toolbar, text="Alpha:").pack(side="left")
-entry_alpha = tk.Entry(toolbar, width=6)
-entry_alpha.insert(0, "0.95")
-entry_alpha.pack(side="left", padx=5)
-
-tk.Label(toolbar, text="K (Số vòng lặp tối đa):").pack(side="left")
-entry_K = tk.Entry(toolbar, width=6)
-entry_K.insert(0, "1000")
-entry_K.pack(side="left", padx=5)
-
 btn_start = tk.Button(toolbar, text="Bắt đầu", command=start)
 btn_start.pack(side="left", padx=5)
+
 btn_stop = tk.Button(toolbar, text="Dừng", command=stop)
 btn_stop.pack(side="left", padx=5)
 
 lbl_info = tk.Label(toolbar, text="Thông tin")
 lbl_info.pack(side="left", padx=15)
 
-root.minsize(800,600)
+root.minsize(800,700)
 root.mainloop()
