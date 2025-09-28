@@ -1,0 +1,295 @@
+import tkinter as tk
+from PIL import Image, ImageTk
+import random
+
+def generate_solution(n=8):
+    solution = []
+    cols = [-1]*n
+    used_cols = set()
+    used_d1 = set()
+    used_d2 = set()
+
+    def place(r):
+        if r == n:
+            return True
+        candidates = list(range(n))
+        random.shuffle(candidates)
+        for c in candidates:
+            if c in used_cols or (r-c) in used_d1 or (r+c) in used_d2:
+                continue
+            cols[r] = c
+            used_cols.add(c)
+            used_d1.add(r-c)
+            used_d2.add(r+c)
+            if place(r+1):
+                return True
+            cols[r] = -1
+            used_cols.remove(c)
+            used_d1.remove(r-c)
+            used_d2.remove(r+c)
+        return False
+
+    place(0)
+    for i in range(n):
+        solution.append((i, cols[i]))
+    return solution
+
+class StepNondeterministic:
+    def __init__(self, n=8, target=None, success_prob=0.8):
+
+        self.n = n
+        self.success_prob = success_prob
+        self.target_cols = [-1] * n
+        if target:
+            self.set_target(target)
+        self.reset()
+
+    def set_target(self, target):
+        self.target_cols = [-1] * self.n
+        for (r, c) in target:
+            if 0 <= r < self.n and 0 <= c < self.n:
+                self.target_cols[r] = c
+
+    def reset(self):
+        n = self.n
+        self.cols = [-1] * n           
+        self.used_cols = set()
+        self.used_d1 = set()
+        self.used_d2 = set()
+        self.r = 0                      
+        self.next_col = [0] * n         
+        self.last_pos = None
+
+    def current_positions(self):
+        return [(i, self.cols[i]) for i in range(self.n) if self.cols[i] != -1]
+
+    def is_safe(self, r, c):
+        return (c not in self.used_cols and
+                (r - c) not in self.used_d1 and
+                (r + c) not in self.used_d2)
+
+    def find_prev_placed(self, start):
+        prev = start - 1
+        while prev >= 0:
+            if self.cols[prev] != -1:
+                return prev
+            prev -= 1
+        return -1
+
+    def step(self):
+        n = self.n
+
+        if self.r >= n:
+            return False
+
+        target_c = self.target_cols[self.r]
+
+        if target_c != -1:
+            if self.is_safe(self.r, target_c):
+                self.cols[self.r] = target_c
+                self.used_cols.add(target_c)
+                self.used_d1.add(self.r - target_c)
+                self.used_d2.add(self.r + target_c)
+                self.last_pos = (self.r, target_c)
+
+                if random.random() < self.success_prob:
+                    self.r += 1
+                    if self.r < n:
+                        self.next_col[self.r] = 0
+                    return True
+                else:
+                    try:
+                        self.used_cols.remove(target_c)
+                        self.used_d1.remove(self.r - target_c)
+                        self.used_d2.remove(self.r + target_c)
+                    except KeyError:
+                        pass
+                    self.cols[self.r] = -1
+                    self.last_pos = None
+                    return True
+            else:
+                prev = self.find_prev_placed(self.r)
+                if prev < 0:
+                    return False
+                c_old = self.cols[prev]
+                if c_old != -1:
+                    try:
+                        self.used_cols.remove(c_old)
+                        self.used_d1.remove(prev - c_old)
+                        self.used_d2.remove(prev + c_old)
+                    except KeyError:
+                        pass
+                self.cols[prev] = -1
+                self.r = prev
+                self.last_pos = None
+                return True
+
+        else:
+            c = self.next_col[self.r]
+            while c < n and not self.is_safe(self.r, c):
+                c += 1
+            if c < n:
+                self.cols[self.r] = c
+                self.used_cols.add(c)
+                self.used_d1.add(self.r - c)
+                self.used_d2.add(self.r + c)
+                self.last_pos = (self.r, c)
+            
+                if random.random() < self.success_prob:
+                    self.r += 1
+                    if self.r < n:
+                        self.next_col[self.r] = 0
+                    return True
+                else:
+                    try:
+                        self.used_cols.remove(c)
+                        self.used_d1.remove(self.r - c)
+                        self.used_d2.remove(self.r + c)
+                    except KeyError:
+                        pass
+                    self.cols[self.r] = -1
+                    self.next_col[self.r] = c + 1
+                    self.last_pos = None
+                    return True
+            else:
+                prev = self.find_prev_placed(self.r)
+                if prev < 0:
+                    return False
+                c_old = self.cols[prev]
+                if c_old != -1:
+                    try:
+                        self.used_cols.remove(c_old)
+                        self.used_d1.remove(prev - c_old)
+                        self.used_d2.remove(prev + c_old)
+                    except KeyError:
+                        pass
+                self.cols[prev] = -1
+                self.next_col[prev] = (c_old + 1) if c_old is not None else 0
+                self.r = prev
+                self.last_pos = None
+                return True
+
+
+def taobanco_fixed(r, title, size=520):
+    frame = tk.LabelFrame(r, text=title, padx=8, pady=8)
+    frame.grid_propagate(False)
+    banco = tk.Frame(frame, height=size, width=size, bg="white")
+    banco.pack(fill="both", expand=True)
+    cells = [[None for _ in range(8)] for _ in range(8)]
+    for i in range(8):
+        banco.grid_columnconfigure(i, weight=1, uniform="o")
+        banco.grid_rowconfigure(i, weight=1, uniform="o")
+        for j in range(8):
+            color = "black" if (i + j) % 2 else "white"
+            cell = tk.Frame(banco, bg=color, borderwidth=1, relief="solid")
+            cell.grid(row=i, column=j, sticky="nsew")
+            cell.grid_propagate(False)
+            cells[i][j] = cell
+    return frame, banco, cells
+
+
+def veoco_fixed(cells, queens=None, queenimg=None, highlight=None):
+    for i in range(8):
+        for j in range(8):
+            for w in cells[i][j].winfo_children():
+                w.destroy()
+            cells[i][j]["highlightbackground"] = "black"
+            cells[i][j]["highlightthickness"] = 1
+
+    queens = set(queens or [])
+    for (i, j) in queens:
+        if 0 <= i < 8 and 0 <= j < 8:
+            if queenimg is not None:
+                tk.Label(cells[i][j], image=queenimg, bg=cells[i][j]["bg"]).pack(expand=True)
+            else:
+                color = cells[i][j]["bg"]
+                fg = "white" if color == "black" else "black"
+                tk.Label(cells[i][j], text="Q", font=("Arial", 28, "bold"), fg=fg, bg=color).pack(expand=True)
+
+    if highlight:
+        i, j = highlight
+        if 0 <= i < 8 and 0 <= j < 8:
+            cells[i][j]["highlightbackground"] = "yellow"
+            cells[i][j]["highlightthickness"] = 3
+
+
+root = tk.Tk()
+root.title("8 Hậu – Nondeterministic Search (target-driven)")
+root.grid_columnconfigure(0, weight=1, uniform="khung")
+root.grid_columnconfigure(1, weight=1, uniform="khung")
+root.grid_rowconfigure(0, weight=1)
+
+khungtrai, bancotrai, cells_trai = taobanco_fixed(root, "Bàn cờ (quá trình)")
+khungphai, bancophai, cells_phai = taobanco_fixed(root, "Bàn cờ mục tiêu")
+khungtrai.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+khungphai.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+
+hau = ImageTk.PhotoImage(Image.open("queen.jpg").resize((56, 56)))
+
+muc_tieu = generate_solution(8)
+solver = StepNondeterministic(n=8, target=muc_tieu, success_prob=0.8)
+
+veoco_fixed(cells_phai, queens=muc_tieu, queenimg=hau)
+veoco_fixed(cells_trai, queens=[], queenimg=hau)
+
+delay = 500
+running = False
+
+def positions_match_target(positions, target):
+    return set(positions) == set(target)
+
+def buoc_tiep():
+    global running
+    running = True
+    def run_step():
+        global running
+        if not running:
+            return
+        prev_pos = solver.current_positions()
+        veoco_fixed(cells_trai, queens=prev_pos, queenimg=hau, highlight=solver.last_pos)
+
+        changed = solver.step()
+        veoco_fixed(cells_phai, queens=muc_tieu, queenimg=hau)
+
+        if positions_match_target(solver.current_positions(), muc_tieu):
+            running = False
+            btn_buoc.config(text="Đã đạt nghiệm (Trùng mục tiêu!)")
+            veoco_fixed(cells_trai, queens=solver.current_positions(), queenimg=hau)
+            return
+
+        if changed:
+            root.after(delay, run_step)
+        else:
+            running = False
+            btn_buoc.config(text="Kết thúc (không tìm được chiến lược)")
+            return
+
+    run_step()
+
+def lam_moi():
+    global running, muc_tieu, solver
+    running = False
+    muc_tieu = generate_solution(8)
+    solver = StepNondeterministic(n=8, target=muc_tieu, success_prob=0.8)
+    veoco_fixed(cells_trai, queens=[], queenimg=hau)
+    veoco_fixed(cells_phai, queens=muc_tieu, queenimg=hau)
+    btn_buoc.config(text="Bắt đầu")
+
+def tang_toc():
+    global delay
+    delay = 100
+
+toolbar = tk.Frame(root)
+toolbar.grid(row=1, column=0, columnspan=2, pady=(0, 10))
+
+btn_buoc = tk.Button(toolbar, text="Bắt đầu", command=buoc_tiep)
+btn_buoc.pack(side="left", padx=5)
+
+btn_tangtoc = tk.Button(toolbar, text="Tăng tốc", command=tang_toc)
+btn_tangtoc.pack(side="left", padx=5)
+
+btn_lammoi = tk.Button(toolbar, text="Làm mới", command=lam_moi)
+btn_lammoi.pack(side="left", padx=5)
+
+root.minsize(900, 700)
+root.mainloop()

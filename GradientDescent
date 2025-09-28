@@ -14,7 +14,7 @@ def cost(state):
             if state[i] == state[j] or abs(state[i]-state[j]) == abs(i-j):
                 conflicts += 1
     return conflicts
-
+s
 def best_neighbor(state):
     n = len(state)
     best_state = state[:]

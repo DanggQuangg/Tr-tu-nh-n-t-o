@@ -1,7 +1,7 @@
-import tkinter as tk 
+import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
-import random
+import random, math
 
 def random_state(n=4):
     return [random.randint(0, n-1) for _ in range(n)]
@@ -15,24 +15,15 @@ def cost(state):
                 conflicts += 1
     return conflicts
 
-def best_neighbor(state):
-    """Tìm neighbor có cost tốt nhất (giảm nhiều nhất)"""
+def neighbor(state):
     n = len(state)
-    best_state = state[:]
-    best_cost = cost(state)
-    best_row, best_col = -1, -1
-    for row in range(n):
-        for col in range(n):
-            if col == state[row]:
-                continue
-            new_state = state[:]
-            new_state[row] = col
-            c = cost(new_state)
-            if c < best_cost:
-                best_cost = c
-                best_state = new_state[:]
-                best_row, best_col = row, col
-    return best_state, best_cost, best_row, best_col
+    new_state = state[:]
+    row = random.randint(0, n-1)
+    new_col = random.randint(0, n-1)
+    while new_col == new_state[row]:
+        new_col = random.randint(0, n-1)
+    new_state[row] = new_col
+    return new_state, row, new_col
 
 def taobanco_fixed(r, title, n=4, size=360):
     frame = tk.LabelFrame(r, text=title, padx=8, pady=8)
@@ -69,20 +60,20 @@ def veoco_fixed(cells, state=None, queenimg=None, highlight=None):
                 fg = "white" if color == "black" else "black"
                 tk.Label(cells[row][col], text="Q", font=("Arial",28,"bold"), fg=fg, bg=color).pack(expand=True)
 
-    if highlight and highlight[0] != -1:
+    if highlight:
         i, j = highlight
         cells[i][j]["highlightbackground"] = "yellow"
         cells[i][j]["highlightthickness"] = 3
 
 
 root = tk.Tk()
-root.title("4 Hậu – Gradient Descent")
+root.title("4 Hậu – Simulated Annealing")
 root.grid_columnconfigure(0, weight=1, uniform="khung")
 root.grid_columnconfigure(1, weight=1, uniform="khung")
 root.grid_rowconfigure(0, weight=1)
 
 khungtrai, _, cells_trai = taobanco_fixed(root, "Bàn cờ hiện tại", n=4)
-khungphai, _, cells_phai = taobanco_fixed(root, "Bàn cờ GD", n=4)
+khungphai, _, cells_phai = taobanco_fixed(root, "Bàn cờ SA", n=4)
 khungtrai.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 khungphai.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
 
@@ -94,12 +85,14 @@ veoco_fixed(cells_phai, state, hau)
 
 running = False
 delay = 800
+T = 10.0
+alpha = 0.95
 step_count = 0
 
 frame_log = tk.LabelFrame(root, text="Log chạy thuật toán", padx=5, pady=5)
 frame_log.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
 
-columns = ("Step", "Cost", "Row", "Col")
+columns = ("Step", "Cost", "DeltaE", "Accept", "Row", "Col")
 tree = ttk.Treeview(frame_log, columns=columns, show="headings", height=8)
 for col in columns:
     tree.heading(col, text=col)
@@ -107,26 +100,36 @@ for col in columns:
 tree.pack(fill="both", expand=True)
 
 def run_step():
-    global state, running, step_count
+    global state, T, running, step_count
     if not running:
         return
 
     step_count += 1
-    new_state, new_cost, row, col = best_neighbor(state)
-    if new_cost < cost(state):
-        state = new_state
-        veoco_fixed(cells_trai, state, hau, highlight=(row, col))
-        veoco_fixed(cells_phai, state, hau)
-        lbl_info.config(text=f"Cost={new_cost}")
-        tree.insert("", "end", values=(step_count, new_cost, row, col))
-    else:
-        lbl_info.config(text=f"Dừng tại cost={cost(state)} (local minima)")
-        running = False
-        btn_start.config(text="Đã dừng")
-        return
+    current_cost = cost(state)
+    new_state, row, col = neighbor(state)
+    new_cost = cost(new_state)
+    deltaE = new_cost - current_cost
 
-    if cost(state) == 0:
-        lbl_info.config(text="Tìm thấy nghiệm tối ưu!")
+    accept = False
+    if deltaE <= 0:
+        accept = True
+    else:
+        p = math.exp(-deltaE / T)
+        if random.random() < p:
+            accept = True
+
+    if accept:
+        state = new_state
+
+    veoco_fixed(cells_trai, state, hau, highlight=(row, state[row]))
+    veoco_fixed(cells_phai, state, hau)
+    lbl_info.config(text=f"T={T:.2f}, cost={cost(state)}, ΔE={deltaE}")
+
+    tree.insert("", "end", values=(step_count, cost(state), deltaE, "Yes" if accept else "No", row, state[row]))
+
+    # Giảm T
+    T *= alpha
+    if T < 0.001 or cost(state) == 0:
         running = False
         btn_start.config(text="Đã dừng")
         return
@@ -134,17 +137,28 @@ def run_step():
     root.after(delay, run_step)
 
 def start():
-    global running, state, step_count
+    global running, T, alpha, state, step_count
+    try:
+        T0 = float(entry_T.get())
+        a = float(entry_alpha.get())
+    except:
+        T0, a = 10.0, 0.95
     state = random_state(4)
     veoco_fixed(cells_trai, state, hau)
     veoco_fixed(cells_phai, state, hau)
     lbl_info.config(text=f"Khởi tạo: cost={cost(state)}")
     btn_start.config(text="Đang chạy")
+    reset_Ta(T0, a)
     step_count = 0
     for i in tree.get_children():
         tree.delete(i)  
     running = True
     run_step()
+
+def reset_Ta(T0, a):
+    global T, alpha
+    T = T0
+    alpha = a
 
 def stop():
     global running
@@ -153,6 +167,16 @@ def stop():
 
 toolbar = tk.Frame(root)
 toolbar.grid(row=1, column=0, columnspan=2, pady=(5,5))
+
+tk.Label(toolbar, text="T ban đầu:").pack(side="left")
+entry_T = tk.Entry(toolbar, width=6)
+entry_T.insert(0, "10")
+entry_T.pack(side="left", padx=5)
+
+tk.Label(toolbar, text="Alpha:").pack(side="left")
+entry_alpha = tk.Entry(toolbar, width=6)
+entry_alpha.insert(0, "0.95")
+entry_alpha.pack(side="left", padx=5)
 
 btn_start = tk.Button(toolbar, text="Bắt đầu", command=start)
 btn_start.pack(side="left", padx=5)

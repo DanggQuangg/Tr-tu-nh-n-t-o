@@ -1,0 +1,204 @@
+import tkinter as tk
+from PIL import Image, ImageTk
+import random
+
+# ===================== TẠO LỜI GIẢI MỤC TIÊU =====================
+def generate_solution(n=8):
+    solution = []
+    cols = [-1]*n
+    used_cols = set()
+    used_d1 = set()
+    used_d2 = set()
+
+    def place(r):
+        if r == n:
+            return True
+        candidates = list(range(n))
+        random.shuffle(candidates)
+        for c in candidates:
+            if c in used_cols or (r-c) in used_d1 or (r+c) in used_d2:
+                continue
+            cols[r] = c
+            used_cols.add(c)
+            used_d1.add(r-c)
+            used_d2.add(r+c)
+            if place(r+1):
+                return True
+            cols[r] = -1
+            used_cols.remove(c)
+            used_d1.remove(r-c)
+            used_d2.remove(r+c)
+        return False
+
+    place(0)
+    for i in range(n):
+        solution.append((i, cols[i]))
+    return solution
+
+# ===================== DFS BLIND SEARCH =====================
+class BlindDFSSolver:
+    def __init__(self, n=8, target=None):
+        self.n = n
+        self.target = set(target) if target else set()
+        self.steps = []
+        self.solution = None
+        self.found = False
+        self.cols = [-1] * n
+        self.used_cols = set()
+        self.used_d1 = set()
+        self.used_d2 = set()
+        self.dfs(0)
+
+    def is_safe(self, r, c):
+        return (c not in self.used_cols and
+                (r - c) not in self.used_d1 and
+                (r + c) not in self.used_d2)
+
+    def dfs(self, r):
+        if self.found:  # nếu đã tìm ra thì không cần tìm tiếp
+            return True
+        if r == self.n:
+            state = {(i, self.cols[i]) for i in range(self.n)}
+            self.steps.append(list(state))
+            if state == self.target:
+                self.solution = list(state)
+                self.found = True
+            return self.found
+
+        for c in range(self.n):
+            if self.is_safe(r, c):
+                self.cols[r] = c
+                self.used_cols.add(c)
+                self.used_d1.add(r - c)
+                self.used_d2.add(r + c)
+                # ghi lại từng trạng thái
+                self.steps.append([(i, self.cols[i]) for i in range(r + 1)])
+
+                if self.dfs(r + 1):
+                    return True
+
+                # quay lui
+                self.cols[r] = -1
+                self.used_cols.remove(c)
+                self.used_d1.remove(r - c)
+                self.used_d2.remove(r + c)
+        return False
+
+# ===================== VẼ BÀN CỜ =====================
+def taobanco_fixed(r, title, size=520):
+    frame = tk.LabelFrame(r, text=title, padx=8, pady=8)
+    frame.grid_propagate(False)
+    banco = tk.Frame(frame, height=size, width=size, bg="white")
+    banco.pack(fill="both", expand=True)
+    cells = [[None for _ in range(8)] for _ in range(8)]
+    for i in range(8):
+        banco.grid_columnconfigure(i, weight=1, uniform="o")
+        banco.grid_rowconfigure(i, weight=1, uniform="o")
+        for j in range(8):
+            color = "black" if (i + j) % 2 else "white"
+            cell = tk.Frame(banco, bg=color, borderwidth=1, relief="solid")
+            cell.grid(row=i, column=j, sticky="nsew")
+            cell.grid_propagate(False)
+            cells[i][j] = cell
+    return frame, banco, cells
+
+def veoco_fixed(cells, queens=None, queenimg=None, highlight=None):
+    for i in range(8):
+        for j in range(8):
+            for w in cells[i][j].winfo_children():
+                w.destroy()
+            cells[i][j]["highlightbackground"] = "black"
+            cells[i][j]["highlightthickness"] = 1
+
+    queens = set(queens or [])
+    for (i, j) in queens:
+        if 0 <= i < 8 and 0 <= j < 8:
+            if queenimg is not None:
+                tk.Label(cells[i][j], image=queenimg, bg=cells[i][j]["bg"]).pack(expand=True)
+            else:
+                color = cells[i][j]["bg"]
+                fg = "white" if color == "black" else "black"
+                tk.Label(cells[i][j], text="Q", font=("Arial", 28, "bold"), fg=fg, bg=color).pack(expand=True)
+
+    if highlight:
+        i, j = highlight
+        if 0 <= i < 8 and 0 <= j < 8:
+            cells[i][j]["highlightbackground"] = "yellow"
+            cells[i][j]["highlightthickness"] = 3
+
+# ===================== GIAO DIỆN =====================
+root = tk.Tk()
+root.title("8 Hậu – Blind Search DFS (Dừng khi đúng mục tiêu)")
+root.grid_columnconfigure(0, weight=1, uniform="khung")
+root.grid_columnconfigure(1, weight=1, uniform="khung")
+root.grid_rowconfigure(0, weight=1)
+
+khungtrai, bancotrai, cells_trai = taobanco_fixed(root, "Bàn cờ (tìm kiếm mù)")
+khungphai, bancophai, cells_phai = taobanco_fixed(root, "Bàn cờ mục tiêu")
+khungtrai.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+khungphai.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+
+hau = ImageTk.PhotoImage(Image.open("queen.jpg").resize((56, 56)))
+
+# Khởi tạo mục tiêu và solver
+muc_tieu = generate_solution(8)
+solver = BlindDFSSolver(n=8, target=muc_tieu)
+
+veoco_fixed(cells_phai, queens=muc_tieu, queenimg=hau)
+veoco_fixed(cells_trai, queens=[], queenimg=hau)
+
+delay = 500
+running = False
+step_index = 0
+
+# ===================== HÀM CHẠY =====================
+def buoc_tiep():
+    global running, step_index
+    running = True
+    step_index = 0
+
+    def run_step():
+        global running, step_index
+        if not running or step_index >= len(solver.steps):
+            running = False
+            if solver.found:
+                btn_buoc.config(text="✅ Đã tìm ra đúng trạng thái mục tiêu!")
+                veoco_fixed(cells_trai, queens=solver.solution, queenimg=hau)
+            else:
+                btn_buoc.config(text="❌ Không tìm được trạng thái mục tiêu!")
+            return
+
+        veoco_fixed(cells_trai, queens=solver.steps[step_index], queenimg=hau)
+        step_index += 1
+        root.after(delay, run_step)
+
+    run_step()
+
+def lam_moi():
+    global running, muc_tieu, solver, step_index
+    running = False
+    muc_tieu = generate_solution(8)
+    solver = BlindDFSSolver(n=8, target=muc_tieu)
+    step_index = 0
+    veoco_fixed(cells_trai, queens=[], queenimg=hau)
+    veoco_fixed(cells_phai, queens=muc_tieu, queenimg=hau)
+    btn_buoc.config(text="Bắt đầu DFS")
+
+def tang_toc():
+    global delay
+    delay = 100
+
+toolbar = tk.Frame(root)
+toolbar.grid(row=1, column=0, columnspan=2, pady=(0, 10))
+
+btn_buoc = tk.Button(toolbar, text="Bắt đầu DFS", command=buoc_tiep)
+btn_buoc.pack(side="left", padx=5)
+
+btn_tangtoc = tk.Button(toolbar, text="Tăng tốc", command=tang_toc)
+btn_tangtoc.pack(side="left", padx=5)
+
+btn_lammoi = tk.Button(toolbar, text="Làm mới", command=lam_moi)
+btn_lammoi.pack(side="left", padx=5)
+
+root.minsize(900, 700)
+root.mainloop()
